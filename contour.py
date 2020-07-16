@@ -22,13 +22,14 @@ class Piture():
             for j in range(self.w):
                 Y = (0.3*self.img[i,j,0]+0.59*self.img[i,j,1]+0.11*self.img[i,j,2])/255
                 gray[i,j]=np.array([Y,Y,Y])
+        self.pre=gray
         return gray
     #-----------------------------------------------------------------------
 
     #-----------------------prewiit edge detector---------------------------
     def prewiit(self):
         print('start to prewiit...')
-        gray=self.gray_scale()
+        gray=self.pre
         result = np.zeros(self.img.shape) # new array for prewiit 
         for i in range(1,self.h-1):
             for j in range(1,self.w-1):
@@ -41,6 +42,9 @@ class Piture():
                     G=0
                 result[i,j]=np.array([G,G,G])
         self.pre=result
+        plt.imshow(self.pre)
+        plt.axis('off')
+        plt.show()
         return result
     #------------------------------------------------------------------------
 
@@ -62,18 +66,17 @@ class Piture():
         bmp=potrace.Bitmap(self.pre[:,:,0])
         path=bmp.trace()
         for curve in path:
-            # print(curve.start_point)
-            self.gcode.append('U')
-            self.gcode.append('G0 X%.4f Y%.4f'%(curve.start_point[0]/self.w*self.x_max,curve.start_point[1]/self.h*self.y_max))
-            self.gcode.append('D')
+            ratio=self.x_max/max(self.w,self.h) #normalize for drawing machine
+            self.gcode.append('U') #抬筆
+            self.gcode.append('G0 X%.4f Y%.4f'%(curve.start_point[0]*ratio,curve.start_point[1]*ratio)) #移動到起始點
+            self.gcode.append('D') #下筆
             for segment in curve:
-                # print(segment)
                 if segment.is_corner:
-                    self.gcode.append('G1 X%.4f Y%.4f F500'%(segment.c[0]/self.w*self.x_max,segment.c[1]/self.h*self.y_max))
-                    self.gcode.append('G1 X%.4f Y%.4f F500'%(segment.end_point[0]/self.w*self.x_max,segment.end_point[1]/self.h*self.y_max))
+                    self.gcode.append('G1 X%.4f Y%.4f F500'%(segment.c[0]*ratio,segment.c[1]*ratio)) #畫至corner的轉角點
+                    self.gcode.append('G1 X%.4f Y%.4f F500'%(segment.end_point[0]*ratio,segment.end_point[1]*ratio)) #畫至corner的終點
                 else:
-                    self.gcode.append('G1 X%.4f Y%.4f F500'%(segment.end_point[0]/self.w*self.x_max,segment.end_point[1]/self.h*self.y_max))
-        self.gcode.append('U')
+                    self.gcode.append('G1 X%.4f Y%.4f F500'%(segment.end_point[0]*ratio,segment.end_point[1]*ratio)) #畫至Bezier segment的終點
+        self.gcode.append('U') #抬筆
         return self.gcode
     
     def save_gcode(self):
@@ -82,7 +85,8 @@ class Piture():
                 f.write('%s\n'%self.gcode[i])
 
 if __name__=='__main__':
-    pic=Piture('img/bear.jpg')
+    pic=Piture('img/bear.jpg') #輸入圖片的路徑
+    pic.gray_scale()
     pic.prewiit()
     pic.denoise()
     gcode=pic.gen_gcode()
