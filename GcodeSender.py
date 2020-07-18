@@ -3,7 +3,7 @@ import time
 import serial
 
 PORT, Baud = 'COM4', 9600
-default_input_file = "GCodes.txt"
+default_input_file = "output.txt"
 
 if sys.argv.__len__() > 1:
     gcodefile = open(sys.argv[1])
@@ -41,7 +41,9 @@ while line:
     print("Command:", line.strip())
     s.write(line.strip().encode())
     # s.read()
-    time.sleep(2)
+    while True:
+        if s.readline()=="complete":
+            break
     line = inputLine(gcodefile)
 
 gcodefile.close()

@@ -11,7 +11,7 @@ class Piture():
         self.img=mpimg.imread(filepath)
         self.h,self.w,self.c=self.img.shape
         self.pre=np.ones(self.img.shape)
-        self.gcode=['G21','G90','G92 X0 Y0']
+        self.gcode=['G28']
         self.x_max=150
         self.y_max=150
     #----------------------convert to gray scale----------------------------
@@ -42,9 +42,9 @@ class Piture():
                     G=0
                 result[i,j]=np.array([G,G,G])
         self.pre=result
-        plt.imshow(self.pre)
-        plt.axis('off')
-        plt.show()
+        # plt.imshow(self.pre)
+        # plt.axis('off')
+        # plt.show()
         return result
     #------------------------------------------------------------------------
 
