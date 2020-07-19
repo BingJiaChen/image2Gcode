@@ -72,10 +72,10 @@ class Piture():
             self.gcode.append('D') #下筆
             for segment in curve:
                 if segment.is_corner:
-                    self.gcode.append('G1 X%.4f Y%.4f F500'%(segment.c[0]*ratio,segment.c[1]*ratio)) #畫至corner的轉角點
-                    self.gcode.append('G1 X%.4f Y%.4f F500'%(segment.end_point[0]*ratio,segment.end_point[1]*ratio)) #畫至corner的終點
+                    self.gcode.append('G1 X%.4f Y%.4f'%(segment.c[0]*ratio,segment.c[1]*ratio)) #畫至corner的轉角點
+                    self.gcode.append('G1 X%.4f Y%.4f'%(segment.end_point[0]*ratio,segment.end_point[1]*ratio)) #畫至corner的終點
                 else:
-                    self.gcode.append('G1 X%.4f Y%.4f F500'%(segment.end_point[0]*ratio,segment.end_point[1]*ratio)) #畫至Bezier segment的終點
+                    self.gcode.append('G1 X%.4f Y%.4f'%(segment.end_point[0]*ratio,segment.end_point[1]*ratio)) #畫至Bezier segment的終點
         self.gcode.append('U') #抬筆
         return self.gcode
     
