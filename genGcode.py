@@ -1,17 +1,20 @@
 import matplotlib.pyplot as plt
-import matplotlib.image as mpimg
+# import matplotlib.image as mpimg
+from PIL import Image
 import numpy as np
 import potrace
 
-
-
-
 class Piture():
     def __init__(self,filepath):
-        self.img=mpimg.imread(filepath)
+        # self.img=mpimg.imread(filepath)
+        self.img = Image.open(filepath)
+        # self.img = self.img.resize((300,300))
+        self.img = np.array(self.img)
+        print(self.img.shape)
         self.h,self.w,self.c=self.img.shape
         self.pre=np.ones(self.img.shape)
         self.gcode=['G28']
+        self.connectPixel = 10 # connection expand max
         self.x_max=50
         self.y_max=50
     #----------------------convert to gray scale----------------------------
@@ -42,11 +45,22 @@ class Piture():
                     G=0
                 result[i,j]=np.array([G,G,G])
         self.pre=result
-        # plt.imshow(self.pre)
-        # plt.axis('off')
-        # plt.show()
         return result
     #------------------------------------------------------------------------
+    def resizeAfterGrayScale(self, size):
+        print('Resize to: ', size)
+        tmp = self.pre[:, :, 0]
+        tmp = Image.fromarray(np.uint8(tmp * 255), 'L')
+        tmp = tmp.resize(size)
+        tmp.show()
+        tmp = np.array(tmp)
+        self.pre = np.zeros((tmp.shape[0], tmp.shape[1], 3))
+        self.h,self.w = tmp.shape
+        for i in range(tmp.shape[0]):
+            for j in range(tmp.shape[1]):
+                G = 0
+                if tmp[i, j] > 0: G = 1
+                self.pre[i, j] = np.array([G, G, G])
 
     def denoise(self):
         print('start to denoise...')
@@ -59,7 +73,8 @@ class Piture():
     def edge_thinning(self):
         print('start edge thinning...')
         deletable = np.zeros(self.pre.shape)
-        while True:
+        thin_times = 4
+        for i in range(thin_times):
             for i in range(1,self.h-1):
                 for j in range(1,self.w-1):
                     if self.pre[i,j,0]==0:
@@ -84,7 +99,7 @@ class Piture():
     def connect(self):
         print('start to connect...')
         addable = np.zeros(self.pre.shape)
-        for times in range(15):
+        for times in range(self.connectPixel):
             for i in range(1,self.h-1):
                 for j in range(1,self.w-1):
                     sk = self.pre[i-1:i+2,j-1:j+2,0]
@@ -132,8 +147,8 @@ class Piture():
     def pruning(self):
         print('start pruning...')
         deletable = np.zeros(self.pre.shape)
-        time = 0
-        while True:
+        # time = 0
+        for times in range(self.connectPixel):
             for i in range(1,self.h-1):
                 for j in range(1,self.w-1):
                     if self.pre[i,j,0]==0:
@@ -145,21 +160,27 @@ class Piture():
                         deletable[i,j]=np.array([1,1,1])
                     if np.sum(sk==sk2)==9 or np.sum(sk==np.rot90(sk2))==9 or np.sum(sk==np.rot90(sk2,2))==9 or np.sum(sk==np.rot90(sk2,3))==9:
                         deletable[i,j]=np.array([1,1,1])
-            time +=1
+            # time +=1
             self.pre=self.pre-deletable
-            print('pruning for',time,'times , deleting',np.sum(deletable)/3,"pixels")
+            print('pruning for',times + 1,'times , deleting',np.sum(deletable)/3,"pixels")
             if np.sum(deletable)==0:
                 break
             deletable = np.zeros(self.pre.shape)
             
-            if time==15:
-                break
+            # if time==self.connectPixel:
+            #     break
         return self.pre
 
     def show(self):
         plt.imshow(self.pre)
         plt.axis('off')
         plt.show()
+
+    def saveImg(self, output):
+        plt.imshow(self.pre)
+        plt.axis('off')
+        plt.imsave(output + '.jpg', self.pre)
+        print('Save ' + output + '.jpg')
 
     def gen_gcode(self):
         print('generate gcode...')
@@ -173,6 +194,7 @@ class Piture():
             self.gcode.append('G0 X%.4f Y%.4f'%(curve.start_point[0]*ratio,curve.start_point[1]*ratio)) #移動到起始點
             self.gcode.append('M280 P0 S0') #下筆
             for segment in curve:
+                # print(segment)
                 if segment.is_corner:
                     self.gcode.append('G1 X%.4f Y%.4f'%(segment.c[0]*ratio,segment.c[1]*ratio)) #畫至corner的轉角點
                     self.gcode.append('G1 X%.4f Y%.4f'%(segment.end_point[0]*ratio,segment.end_point[1]*ratio)) #畫至corner的終點
@@ -194,14 +216,22 @@ class Piture():
 if __name__=='__main__':
     pic=Piture('img/bear.jpg') #輸入圖片的路徑
     pic.gray_scale()
-    # pic.show()
+    pic.saveImg('gray_scale')
     pic.prewiit()
+    pic.saveImg('prewitt')
     pic.denoise()
-    pic.edge_thinning()
-    pic.denoise()
-    pic.connect()
-    pic.pruning()
-    pic.show()
+    # pic.edge_thinning()
+    # pic.denoise()
+    # pic.saveImg('edge_thinning')
+    # pic.denoise()
+    pic.resizeAfterGrayScale((100, 100))
+    pic.resizeAfterGrayScale((600, 600))
+    pic.saveImg('resized')
+    # pic.connect()
+    # pic.saveImg('connect')
+    # pic.pruning()
+    # pic.saveImg('pruning')
+    pic.saveImg('To Gcode')
     gcode=pic.gen_gcode()
     pic.save_gcode()
 
