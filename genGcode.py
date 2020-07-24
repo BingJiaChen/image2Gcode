@@ -3,6 +3,8 @@ import matplotlib.pyplot as plt
 from PIL import Image
 import numpy as np
 import potrace
+from scipy.ndimage.morphology import binary_closing
+from scipy.ndimage.morphology import binary_fill_holes
 
 class Piture():
     def __init__(self,filepath):
@@ -45,6 +47,8 @@ class Piture():
                     G=0
                 result[i,j]=np.array([G,G,G])
         self.pre=result
+        self.pre = binary_closing(self.pre[:, :, 0], structure=np.ones((3, 2)))
+        self.pre = binary_fill_holes(self.pre)
         return result
     #------------------------------------------------------------------------
     def resizeAfterGrayScale(self, size):
@@ -184,7 +188,8 @@ class Piture():
 
     def gen_gcode(self):
         print('generate gcode...')
-        bmp=potrace.Bitmap(self.pre[:,:,0])
+        bmp=potrace.Bitmap(self.pre[:,:]) # binary fill
+        # bmp=potrace.Bitmap(self.pre[:,:,0])
         path=bmp.trace()
         flag = 0
         for curve in path:
@@ -219,14 +224,14 @@ if __name__=='__main__':
     pic.saveImg('gray_scale')
     pic.prewiit()
     pic.saveImg('prewitt')
-    pic.denoise()
+    # pic.denoise()
     # pic.edge_thinning()
     # pic.denoise()
     # pic.saveImg('edge_thinning')
     # pic.denoise()
-    pic.resizeAfterGrayScale((100, 100))
-    pic.resizeAfterGrayScale((600, 600))
-    pic.saveImg('resized')
+    # pic.resizeAfterGrayScale((100, 100))
+    # pic.resizeAfterGrayScale((600, 600))
+    # pic.saveImg('resized')
     # pic.connect()
     # pic.saveImg('connect')
     # pic.pruning()
