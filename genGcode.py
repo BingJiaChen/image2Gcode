@@ -19,8 +19,8 @@ class Piture():
         self.pre=np.ones(self.img.shape)
         self.gcode=['G28']
         self.connectPixel = 3 # connection expand max
-        self.x_max=50
-        self.y_max=50
+        self.x_max=40
+        self.y_max=40
     #----------------------convert to gray scale----------------------------
     def gray_scale(self):
         print('RBG to gray scale...')
@@ -28,6 +28,8 @@ class Piture():
         for i in range(self.h):
             for j in range(self.w):
                 Y = (0.3*self.img[i,j,0]+0.59*self.img[i,j,1]+0.11*self.img[i,j,2])/255
+                if Y > 0.5: Y = 0
+                else: Y = 1
                 gray[i,j]=np.array([Y,Y,Y])
         self.pre=gray
         return gray
@@ -78,6 +80,23 @@ class Piture():
         tmp = Image.fromarray(np.uint8(tmp * 255), 'L')
         # tmp = tmp.filter(ImageFilter.GaussianBlur(1))
         tmp = tmp.filter(ImageFilter.SMOOTH)
+        # tmp.show()
+        tmp = np.array(tmp)
+        self.pre = np.zeros((tmp.shape[0], tmp.shape[1], 3))
+        self.h,self.w = tmp.shape
+        for i in range(tmp.shape[0]):
+            for j in range(tmp.shape[1]):
+                G = 0
+                if tmp[i, j] > 0: G = 1
+                self.pre[i, j] = np.array([G, G, G])
+    #------------------------------------------------------------------------
+
+    #-----------------------Sharpen the edge---------------------------
+    def sharpen(self):
+        print("start to sharpen")
+        tmp = self.pre[:, :, 0]
+        tmp = Image.fromarray(np.uint8(tmp * 255), 'L')
+        tmp = tmp.filter(ImageFilter.SHARPEN)
         # tmp.show()
         tmp = np.array(tmp)
         self.pre = np.zeros((tmp.shape[0], tmp.shape[1], 3))
@@ -213,8 +232,7 @@ class Piture():
         arr[x, y] = label
         for i in range(x - 1, x + 2): # x - 1 ~ x + 1
             for j in range(y - 1, y + 2): # y - 1 ~ y + 1
-                if i != x and j != y:
-                    self.dfs(arr, i, j, label)
+                self.dfs(arr, i, j, label)
 
     def labeling(self):
         print('Start labeling')
@@ -303,14 +321,17 @@ class Piture():
     
 
 if __name__=='__main__':
-    pic=Piture('img/bear.jpg') #輸入圖片的路徑
+    pic=Piture('img/hit.jpg') #輸入圖片的路徑
     pic.gray_scale()
     pic.saveImg('gray_scale')
-    pic.prewiit()
-    pic.saveImg('prewitt')
-    pic.denoise()
-    pic.smooth()
-    pic.saveImg('smooth')
+    # pic.prewiit()
+    # pic.saveImg('prewitt')
+    # pic.denoise()
+    # pic.sharpen()
+    # pic.saveImg('sharpen')
+
+    # pic.smooth()
+    # pic.saveImg('smooth')
     # pic.edge_thinning()
     # pic.saveImg('edge_thinning')
     # pic.denoise()
@@ -321,7 +342,7 @@ if __name__=='__main__':
     # pic.saveImg('connect')
     # pic.pruning()
     # pic.saveImg('pruning')
-    pic.labeling();
+    # pic.labeling();
     pic.saveImg('To Gcode')
     gcode=pic.gen_gcode()
     pic.save_gcode()
