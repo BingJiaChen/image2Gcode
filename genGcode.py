@@ -1,22 +1,24 @@
 import matplotlib.pyplot as plt
-# import matplotlib.image as mpimg
 from PIL import Image
+from PIL import ImageFilter
 import numpy as np
 import potrace
 from scipy.ndimage.morphology import binary_closing
 from scipy.ndimage.morphology import binary_fill_holes
+import sys
+sys.setrecursionlimit(1000000) # Increase recursive depth to run labeling
 
 class Piture():
     def __init__(self,filepath):
         # self.img=mpimg.imread(filepath)
         self.img = Image.open(filepath)
-        # self.img = self.img.resize((300,300))
+        # self.img = self.img.resize((1200,1200))
         self.img = np.array(self.img)
         print(self.img.shape)
         self.h,self.w,self.c=self.img.shape
         self.pre=np.ones(self.img.shape)
         self.gcode=['G28']
-        self.connectPixel = 10 # connection expand max
+        self.connectPixel = 3 # connection expand max
         self.x_max=50
         self.y_max=50
     #----------------------convert to gray scale----------------------------
@@ -47,16 +49,18 @@ class Piture():
                     G=0
                 result[i,j]=np.array([G,G,G])
         self.pre=result
-        self.pre = binary_closing(self.pre[:, :, 0], structure=np.ones((3, 2)))
-        self.pre = binary_fill_holes(self.pre)
+        # self.pre = binary_closing(self.pre[:, :, 0], structure=np.ones((3, 2)))
+        # self.pre = binary_fill_holes(self.pre)
         return result
     #------------------------------------------------------------------------
+
+    #-----------------------Resize Picture (after grayScale)---------------------------
     def resizeAfterGrayScale(self, size):
         print('Resize to: ', size)
         tmp = self.pre[:, :, 0]
         tmp = Image.fromarray(np.uint8(tmp * 255), 'L')
         tmp = tmp.resize(size)
-        tmp.show()
+        # tmp.show()
         tmp = np.array(tmp)
         self.pre = np.zeros((tmp.shape[0], tmp.shape[1], 3))
         self.h,self.w = tmp.shape
@@ -65,6 +69,25 @@ class Piture():
                 G = 0
                 if tmp[i, j] > 0: G = 1
                 self.pre[i, j] = np.array([G, G, G])
+    #------------------------------------------------------------------------
+
+    #-----------------------Smooth the edge---------------------------
+    def smooth(self):
+        print("start to smooth")
+        tmp = self.pre[:, :, 0]
+        tmp = Image.fromarray(np.uint8(tmp * 255), 'L')
+        # tmp = tmp.filter(ImageFilter.GaussianBlur(1))
+        tmp = tmp.filter(ImageFilter.SMOOTH)
+        # tmp.show()
+        tmp = np.array(tmp)
+        self.pre = np.zeros((tmp.shape[0], tmp.shape[1], 3))
+        self.h,self.w = tmp.shape
+        for i in range(tmp.shape[0]):
+            for j in range(tmp.shape[1]):
+                G = 0
+                if tmp[i, j] > 0: G = 1
+                self.pre[i, j] = np.array([G, G, G])
+    #------------------------------------------------------------------------
 
     def denoise(self):
         print('start to denoise...')
@@ -74,10 +97,11 @@ class Piture():
                     self.pre[i,j]=np.array([0,0,0])
         return self.pre        
 
+    #-----------------------Edge Thinning (make edge to 1 pixel)---------------------------
     def edge_thinning(self):
         print('start edge thinning...')
         deletable = np.zeros(self.pre.shape)
-        thin_times = 4
+        thin_times = 2
         for i in range(thin_times):
             for i in range(1,self.h-1):
                 for j in range(1,self.w-1):
@@ -99,7 +123,9 @@ class Piture():
             self.pre=self.pre-deletable
             deletable = np.zeros(self.pre.shape)
         return self.pre
+    #------------------------------------------------------------------------
 
+    #-----------------------Connect broken line---------------------------
     def connect(self):
         print('start to connect...')
         addable = np.zeros(self.pre.shape)
@@ -148,6 +174,9 @@ class Piture():
                 break
             addable = np.zeros(self.pre.shape)
         return self.pre
+    #------------------------------------------------------------------------
+
+    #-----------------------Prun outsided line---------------------------
     def pruning(self):
         print('start pruning...')
         deletable = np.zeros(self.pre.shape)
@@ -174,22 +203,73 @@ class Piture():
             # if time==self.connectPixel:
             #     break
         return self.pre
+    #------------------------------------------------------------------------
 
+    #-----------------------Component Labeling---------------------------
+    def dfs(self, arr, x, y, label):
+        if x < 0 or x >= arr.shape[0]: return
+        if y < 0 or y >= arr.shape[1]: return
+        if arr[x, y] != -1: return
+        arr[x, y] = label
+        for i in range(x - 1, x + 2): # x - 1 ~ x + 1
+            for j in range(y - 1, y + 2): # y - 1 ~ y + 1
+                if i != x and j != y:
+                    self.dfs(arr, i, j, label)
+
+    def labeling(self):
+        print('Start labeling')
+        tmp = np.array(self.pre[:, :, 0]) # Only need 2d
+        print(tmp.shape)
+        label = 1
+
+        for i in range(tmp.shape[0]):
+            for j in range(tmp.shape[1]):
+                tmp[i, j] = int(tmp[i, j])
+                if tmp[i, j] == 1: tmp[i, j] = -1 # -1 means unlabel white part
+        
+        for i in range(tmp.shape[0]):
+            for j in range(tmp.shape[1]):
+                if tmp[i, j] == -1:
+                    self.dfs(tmp, i, j, label)
+                    label += 1 # Next Component will label + 1
+        print('Component Count: {}'.format(label))
+
+        # Color mapping
+        colorMap = {}
+        for i in range(1, label + 1): # 1 ~ label
+            colorMap[i] = np.random.randint(255, size=3)
+
+        # Print Different color line
+        pic = np.zeros(self.pre.shape)
+        for i in range(tmp.shape[0]):
+            for j in range(tmp.shape[1]):
+                if tmp[i, j] != 0:
+                    pic[i, j] = colorMap[tmp[i, j]] / 255 # Float number shoud be in [0 ~ 1]
+                
+        plt.imshow(pic)
+        plt.axis('off')
+        plt.imsave('labeled.jpg', pic)
+
+    #-----------------------Show the image on the screen---------------------------
     def show(self):
         plt.imshow(self.pre)
         plt.axis('off')
         plt.show()
+    #------------------------------------------------------------------------
 
+    #-----------------------Save the image---------------------------
     def saveImg(self, output):
         plt.imshow(self.pre)
         plt.axis('off')
         plt.imsave(output + '.jpg', self.pre)
         print('Save ' + output + '.jpg')
+    #------------------------------------------------------------------------
 
+    #-----------------------Generate Gcode---------------------------
     def gen_gcode(self):
         print('generate gcode...')
-        bmp=potrace.Bitmap(self.pre[:,:]) # binary fill
-        # bmp=potrace.Bitmap(self.pre[:,:,0])
+        # bmp=potrace.Bitmap(self.pre[:,:]) # binary fill
+        bmp=potrace.Bitmap(self.pre[:,:,0])
         path=bmp.trace()
         flag = 0
         for curve in path:
@@ -212,11 +292,15 @@ class Piture():
                     #     flag+=1
         self.gcode.append('M280 P0 S60') #抬筆
         return self.gcode
+    #------------------------------------------------------------------------
     
+    #-----------------------Save Gcode---------------------------
     def save_gcode(self):
         with open('output.txt','w') as f:
             for i in range(len(self.gcode)):
                 f.write('%s\n'%self.gcode[i])
+    #------------------------------------------------------------------------
+    
 
 if __name__=='__main__':
     pic=Piture('img/bear.jpg') #輸入圖片的路徑
@@ -224,18 +308,20 @@ if __name__=='__main__':
     pic.saveImg('gray_scale')
     pic.prewiit()
     pic.saveImg('prewitt')
-    # pic.denoise()
+    pic.denoise()
+    pic.smooth()
+    pic.saveImg('smooth')
     # pic.edge_thinning()
-    # pic.denoise()
     # pic.saveImg('edge_thinning')
     # pic.denoise()
-    # pic.resizeAfterGrayScale((100, 100))
+    # pic.resizeAfterGrayScale((400, 400))
     # pic.resizeAfterGrayScale((600, 600))
     # pic.saveImg('resized')
     # pic.connect()
     # pic.saveImg('connect')
     # pic.pruning()
     # pic.saveImg('pruning')
+    pic.labeling();
     pic.saveImg('To Gcode')
     gcode=pic.gen_gcode()
     pic.save_gcode()
