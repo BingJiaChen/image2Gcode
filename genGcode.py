@@ -10,9 +10,7 @@ sys.setrecursionlimit(1000000) # Increase recursive depth to run labeling
 
 class Piture():
     def __init__(self,filepath):
-        # self.img=mpimg.imread(filepath)
         self.img = Image.open(filepath)
-        # self.img = self.img.resize((1200,1200))
         self.img = np.array(self.img)
         print(self.img.shape)
         self.h,self.w,self.c=self.img.shape
@@ -21,6 +19,7 @@ class Piture():
         self.connectPixel = 3 # connection expand max
         self.x_max=40
         self.y_max=40
+      
     #----------------------convert to gray scale----------------------------
     def gray_scale(self):
         print('RBG to gray scale...')
@@ -51,8 +50,6 @@ class Piture():
                     G=0
                 result[i,j]=np.array([G,G,G])
         self.pre=result
-        # self.pre = binary_closing(self.pre[:, :, 0], structure=np.ones((3, 2)))
-        # self.pre = binary_fill_holes(self.pre)
         return result
     #------------------------------------------------------------------------
 
@@ -78,9 +75,7 @@ class Piture():
         print("start to smooth")
         tmp = self.pre[:, :, 0]
         tmp = Image.fromarray(np.uint8(tmp * 255), 'L')
-        # tmp = tmp.filter(ImageFilter.GaussianBlur(1))
         tmp = tmp.filter(ImageFilter.SMOOTH)
-        # tmp.show()
         tmp = np.array(tmp)
         self.pre = np.zeros((tmp.shape[0], tmp.shape[1], 3))
         self.h,self.w = tmp.shape
@@ -97,7 +92,6 @@ class Piture():
         tmp = self.pre[:, :, 0]
         tmp = Image.fromarray(np.uint8(tmp * 255), 'L')
         tmp = tmp.filter(ImageFilter.SHARPEN)
-        # tmp.show()
         tmp = np.array(tmp)
         self.pre = np.zeros((tmp.shape[0], tmp.shape[1], 3))
         self.h,self.w = tmp.shape
@@ -199,7 +193,6 @@ class Piture():
     def pruning(self):
         print('start pruning...')
         deletable = np.zeros(self.pre.shape)
-        # time = 0
         for times in range(self.connectPixel):
             for i in range(1,self.h-1):
                 for j in range(1,self.w-1):
@@ -212,15 +205,11 @@ class Piture():
                         deletable[i,j]=np.array([1,1,1])
                     if np.sum(sk==sk2)==9 or np.sum(sk==np.rot90(sk2))==9 or np.sum(sk==np.rot90(sk2,2))==9 or np.sum(sk==np.rot90(sk2,3))==9:
                         deletable[i,j]=np.array([1,1,1])
-            # time +=1
             self.pre=self.pre-deletable
             print('pruning for',times + 1,'times , deleting',np.sum(deletable)/3,"pixels")
             if np.sum(deletable)==0:
                 break
             deletable = np.zeros(self.pre.shape)
-            
-            # if time==self.connectPixel:
-            #     break
         return self.pre
     #------------------------------------------------------------------------
 
@@ -297,53 +286,45 @@ class Piture():
             self.gcode.append('G0 X%.4f Y%.4f'%(curve.start_point[0]*ratio,curve.start_point[1]*ratio)) #移動到起始點
             self.gcode.append('M280 P0 S0') #下筆
             for segment in curve:
-                # print(segment)
                 if segment.is_corner:
                     self.gcode.append('G1 X%.4f Y%.4f'%(segment.c[0]*ratio,segment.c[1]*ratio)) #畫至corner的轉角點
                     self.gcode.append('G1 X%.4f Y%.4f'%(segment.end_point[0]*ratio,segment.end_point[1]*ratio)) #畫至corner的終點
                 else:
                     self.gcode.append('G1 X%.4f Y%.4f'%(segment.end_point[0]*ratio,segment.end_point[1]*ratio)) #畫至Bezier segment的終點
-                    # if flag%4==0:
-                    #     self.gcode.append('G1 X%.4f Y%.4f'%(segment.end_point[0]*ratio,segment.end_point[1]*ratio)) #畫至Bezier segment的終點
-                    #     flag+=1
-                    # else:
-                    #     flag+=1
         self.gcode.append('M280 P0 S60') #抬筆
         return self.gcode
     #------------------------------------------------------------------------
     
     #-----------------------Save Gcode---------------------------
     def save_gcode(self):
-        with open('output.txt','w') as f:
+        with open('gcode.txt','w') as f:
             for i in range(len(self.gcode)):
                 f.write('%s\n'%self.gcode[i])
     #------------------------------------------------------------------------
     
 
 if __name__=='__main__':
-    pic=Piture('img/hit.jpg') #輸入圖片的路徑
+    input_path = 'flower.jpg'
+    pic=Piture(input_path) # 輸入圖片的路徑
     pic.gray_scale()
-    pic.saveImg('gray_scale')
+    pic.saveImg(f'{output_name}_gray_scale')
+
     # pic.prewiit()
-    # pic.saveImg('prewitt')
+    # pic.saveImg(f'{output_name}_prewitt')
     # pic.denoise()
     # pic.sharpen()
-    # pic.saveImg('sharpen')
-
+    # pic.saveImg(f'{output_name}_sharpen')
     # pic.smooth()
-    # pic.saveImg('smooth')
+    # pic.saveImg(f'{output_name}_smooth')
     # pic.edge_thinning()
-    # pic.saveImg('edge_thinning')
-    # pic.denoise()
-    # pic.resizeAfterGrayScale((400, 400))
-    # pic.resizeAfterGrayScale((600, 600))
-    # pic.saveImg('resized')
+    # pic.saveImg(f'{output_name}_edge_thinning')
     # pic.connect()
-    # pic.saveImg('connect')
+    # pic.saveImg(f'{output_name}_connect')
     # pic.pruning()
-    # pic.saveImg('pruning')
-    # pic.labeling();
-    pic.saveImg('To Gcode')
+    # pic.saveImg(f'{output_name}_pruning')
+
+    output_name = input_path.split('.')[0]
+    pic.saveImg(f'{output_name}_gcode')
     gcode=pic.gen_gcode()
     pic.save_gcode()
-
+  
