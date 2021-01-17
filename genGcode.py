@@ -296,19 +296,22 @@ class Piture():
     #------------------------------------------------------------------------
     
     #-----------------------Save Gcode---------------------------
-    def save_gcode(self):
-        with open('gcode.txt','w') as f:
+    def save_gcode(self, output_name):
+        with open(f'{output_name}_gcode.txt','w') as f:
             for i in range(len(self.gcode)):
                 f.write('%s\n'%self.gcode[i])
     #------------------------------------------------------------------------
     
 
 if __name__=='__main__':
-    input_path = 'flower.jpg'
-    pic=Piture(input_path) # 輸入圖片的路徑
-    pic.gray_scale()
-    pic.saveImg(f'{output_name}_gray_scale')
+    input_path = 'img/bear.jpg'
+    output_name = 'out/' + input_path.split('/')[1].split('.')[0]
 
+    pic=Piture(input_path)
+    pic.gray_scale()
+    pic.saveImg(f'{output_name}_grayscale')
+
+    ###### Helper function, try yourself !!! ######
     # pic.prewiit()
     # pic.saveImg(f'{output_name}_prewitt')
     # pic.denoise()
@@ -322,9 +325,8 @@ if __name__=='__main__':
     # pic.saveImg(f'{output_name}_connect')
     # pic.pruning()
     # pic.saveImg(f'{output_name}_pruning')
-
-    output_name = input_path.split('.')[0]
+    
     pic.saveImg(f'{output_name}_gcode')
-    gcode=pic.gen_gcode()
-    pic.save_gcode()
+    gcode = pic.gen_gcode()
+    pic.save_gcode(output_name)
   
